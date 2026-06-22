@@ -42,8 +42,8 @@ type Settings struct {
 	MaxTimeoutMS              int64     `json:"max_timeout_ms,omitempty"`
 	MaxOutputBytes            int64     `json:"max_output_bytes,omitempty"`
 	MaxStdinBytes             int64     `json:"max_stdin_bytes,omitempty"`
-	RequireApproval           bool      `json:"require_approval,omitempty"`
-	ApproveUnmatched          bool      `json:"approve_unmatched,omitempty"`
+	RequireApproval           *bool     `json:"require_approval,omitempty"`
+	ApproveUnmatched          *bool     `json:"approve_unmatched,omitempty"`
 	AllowWorkspaceExecutables bool      `json:"allow_workspace_executables,omitempty"`
 }
 
@@ -74,24 +74,36 @@ func (Registration) Normalize(name string, raw json.RawMessage) (json.RawMessage
 	if name != Exec {
 		return nil, fmt.Errorf("unsupported process capability %q", name)
 	}
-	settings := Settings{
-		Profiles: []Profile{
-			{Name: "go", Rules: []Rule{{Executable: "go"}, {Executable: "gofmt"}}},
-			{Name: "node", Rules: []Rule{{Executable: "node"}, {Executable: "npm", ArgsPrefix: []string{"test"}}, {Executable: "npm", ArgsPrefix: []string{"run"}}}},
-			{Name: "python", Rules: []Rule{{Executable: "python"}, {Executable: "python3"}, {Executable: "pytest"}}},
-			{Name: "rust", Rules: []Rule{{Executable: "cargo"}, {Executable: "rustfmt"}}},
-			{Name: "build", Rules: []Rule{{Executable: "make"}}},
-		},
-		DenyExecutables:  []string{"bash", "chmod", "chown", "curl", "doas", "docker", "fdisk", "kill", "mkfs", "mount", "nc", "podman", "reboot", "rm", "sh", "shutdown", "ssh", "sudo", "su", "umount", "wget", "zsh"},
-		EnvAllow:         []string{"CI", "GOCACHE", "GOFLAGS", "GOMODCACHE", "NODE_ENV", "NO_COLOR", "PYTHONPATH", "RUSTFLAGS", "TERM"},
-		ForwardHostEnv:   []string{"HOME", "LANG", "PATH", "TMPDIR"},
-		MaxTimeoutMS:     int64((10 * time.Minute) / time.Millisecond),
-		MaxOutputBytes:   4 << 20,
-		MaxStdinBytes:    1 << 20,
-		ApproveUnmatched: true,
-	}
+	var settings Settings
 	if err := decodeStrict(raw, &settings); err != nil {
 		return nil, err
+	}
+	if len(settings.Profiles) == 0 {
+		settings.Profiles = defaultProfiles()
+	}
+	if len(settings.DenyExecutables) == 0 {
+		settings.DenyExecutables = []string{"bash", "chmod", "chown", "curl", "doas", "docker", "fdisk", "kill", "mkfs", "mount", "nc", "podman", "reboot", "rm", "sh", "shutdown", "ssh", "sudo", "su", "umount", "wget", "zsh"}
+	}
+	if len(settings.EnvAllow) == 0 {
+		settings.EnvAllow = []string{"CI", "GOCACHE", "GOFLAGS", "GOMODCACHE", "NODE_ENV", "NO_COLOR", "PYTHONPATH", "RUSTFLAGS", "TERM"}
+	}
+	if len(settings.ForwardHostEnv) == 0 {
+		settings.ForwardHostEnv = []string{"HOME", "LANG", "PATH", "TMPDIR"}
+	}
+	if settings.MaxTimeoutMS == 0 {
+		settings.MaxTimeoutMS = int64((10 * time.Minute) / time.Millisecond)
+	}
+	if settings.MaxOutputBytes == 0 {
+		settings.MaxOutputBytes = 4 << 20
+	}
+	if settings.MaxStdinBytes == 0 {
+		settings.MaxStdinBytes = 1 << 20
+	}
+	if settings.RequireApproval == nil {
+		settings.RequireApproval = boolPtr(true)
+	}
+	if settings.ApproveUnmatched == nil {
+		settings.ApproveUnmatched = boolPtr(true)
 	}
 	root, err := canonicalRoot(settings.Root)
 	if err != nil {
@@ -161,7 +173,7 @@ func (Registration) IsSubset(_ string, parent, child json.RawMessage) error {
 			return fmt.Errorf("child removed denied executable %q", executable)
 		}
 	}
-	if p.RequireApproval && !c.RequireApproval || !p.ApproveUnmatched && c.ApproveUnmatched ||
+	if boolVal(p.RequireApproval) && !boolVal(c.RequireApproval) || !boolVal(p.ApproveUnmatched) && boolVal(c.ApproveUnmatched) ||
 		!p.AllowWorkspaceExecutables && c.AllowWorkspaceExecutables {
 		return errors.New("child process policy widens parent permissions")
 	}
@@ -205,7 +217,7 @@ func (h *Handler) DispatchCall(ctx context.Context, call dispatcher.Call) (dispa
 		return dispatcher.Failed(err.Error()), nil
 	}
 	approved := false
-	if h.settings.RequireApproval || decision == commandApproval {
+	if boolVal(h.settings.RequireApproval) || decision == commandApproval {
 		if resolved, ok := resolution.FromContext(ctx); !ok || resolved.Decision != resolution.Approved {
 			return dispatcher.Yield("Approve local command: " + quoteArgv(req.Argv)), nil
 		}
@@ -258,7 +270,7 @@ func (h *Handler) classify(req Request) (commandDecision, error) {
 			}
 		}
 	}
-	if h.settings.ApproveUnmatched {
+	if boolVal(h.settings.ApproveUnmatched) {
 		return commandApproval, nil
 	}
 	return 0, fmt.Errorf("command %q does not match an allowed profile", base)
@@ -519,4 +531,39 @@ func quoteArgv(argv []string) string {
 func insideRoot(root, path string) bool {
 	rel, err := filepath.Rel(root, path)
 	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+func boolPtr(v bool) *bool { return &v }
+
+func boolVal(p *bool) bool { return p != nil && *p }
+
+func defaultProfiles() []Profile {
+	return []Profile{
+		{Name: "go", Rules: []Rule{
+			{Executable: "go", ArgsPrefix: []string{"build"}},
+			{Executable: "go", ArgsPrefix: []string{"test"}},
+			{Executable: "go", ArgsPrefix: []string{"vet"}},
+			{Executable: "go", ArgsPrefix: []string{"fmt"}},
+			{Executable: "go", ArgsPrefix: []string{"mod"}},
+			{Executable: "gofmt"},
+		}},
+		{Name: "python", Rules: []Rule{
+			{Executable: "python", ArgsPrefix: []string{"-m", "pytest"}},
+			{Executable: "python3", ArgsPrefix: []string{"-m", "pytest"}},
+			{Executable: "pytest"},
+		}},
+		{Name: "rust", Rules: []Rule{
+			{Executable: "cargo", ArgsPrefix: []string{"build"}},
+			{Executable: "cargo", ArgsPrefix: []string{"test"}},
+			{Executable: "cargo", ArgsPrefix: []string{"check"}},
+			{Executable: "cargo", ArgsPrefix: []string{"clippy"}},
+			{Executable: "cargo", ArgsPrefix: []string{"fmt"}},
+			{Executable: "rustfmt"},
+		}},
+		{Name: "node", Rules: []Rule{
+			{Executable: "npm", ArgsPrefix: []string{"test"}},
+			{Executable: "npm", ArgsPrefix: []string{"run"}},
+		}},
+		{Name: "build", Rules: []Rule{{Executable: "make"}}},
+	}
 }

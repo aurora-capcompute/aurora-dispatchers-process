@@ -27,7 +27,7 @@ func handler(t *testing.T, extra string) *Handler {
 }
 
 func TestProfileCommandRuns(t *testing.T) {
-	h := handler(t, `"profiles":[{"name":"test","rules":[{"executable":"printf"}]}]`)
+	h := handler(t, `"require_approval":false,"profiles":[{"name":"test","rules":[{"executable":"printf"}]}]`)
 	out, err := h.DispatchCall(context.Background(), dispatcher.Call{
 		Name: Exec, Args: json.RawMessage(`{"argv":["printf","hello"]}`),
 	})
@@ -65,7 +65,7 @@ func TestDeniedExecutableCannotBeApproved(t *testing.T) {
 }
 
 func TestEnvironmentIsExplicit(t *testing.T) {
-	h := handler(t, `"profiles":[{"name":"test","rules":[{"executable":"printenv"}]}],"env_allow":["SAFE"],"forward_host_env":[]`)
+	h := handler(t, `"require_approval":false,"profiles":[{"name":"test","rules":[{"executable":"printenv"}]}],"env_allow":["SAFE"],"forward_host_env":[]`)
 	out, _ := h.DispatchCall(context.Background(), dispatcher.Call{
 		Name: Exec, Args: json.RawMessage(`{"argv":["printenv","SAFE"],"env":{"SAFE":"yes"}}`),
 	})
