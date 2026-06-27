@@ -1,7 +1,6 @@
 package process
 
 import (
-	"github.com/aurora-capcompute/aurora-dispatchers/resolution"
 	"github.com/aurora-capcompute/capcompute/dispatcher"
 	"context"
 	"encoding/json"
@@ -30,7 +29,7 @@ func TestProfileCommandRuns(t *testing.T) {
 	h := handler(t, `"require_approval":false,"profiles":[{"name":"test","rules":[{"executable":"printf"}]}]`)
 	out, err := h.DispatchCall(context.Background(), dispatcher.Call{
 		Name: Exec, Args: json.RawMessage(`{"argv":["printf","hello"]}`),
-	})
+	}, dispatcher.Authorization{})
 	if err != nil || out.Kind() != dispatcher.OutcomeResult {
 		t.Fatalf("outcome=%v message=%q err=%v", out.Kind(), out.Message(), err)
 	}
@@ -44,12 +43,11 @@ func TestProfileCommandRuns(t *testing.T) {
 func TestUnmatchedYieldsThenRunsAfterApproval(t *testing.T) {
 	h := handler(t, `"profiles":[]`)
 	call := dispatcher.Call{Name: Exec, Args: json.RawMessage(`{"argv":["printf","ok"]}`)}
-	out, _ := h.DispatchCall(context.Background(), call)
+	out, _ := h.DispatchCall(context.Background(), call, dispatcher.Authorization{})
 	if out.Kind() != dispatcher.OutcomeYield {
 		t.Fatalf("expected yield, got %v", out.Kind())
 	}
-	ctx := resolution.WithContext(context.Background(), resolution.Resolution{Decision: resolution.Approved})
-	out, _ = h.DispatchCall(ctx, call)
+	out, _ = h.DispatchCall(context.Background(), call, dispatcher.Authorization{Decision: dispatcher.Approved})
 	if out.Kind() != dispatcher.OutcomeResult {
 		t.Fatalf("expected result, got %v: %s", out.Kind(), out.Message())
 	}
@@ -57,8 +55,7 @@ func TestUnmatchedYieldsThenRunsAfterApproval(t *testing.T) {
 
 func TestDeniedExecutableCannotBeApproved(t *testing.T) {
 	h := handler(t, "")
-	ctx := resolution.WithContext(context.Background(), resolution.Resolution{Decision: resolution.Approved})
-	out, _ := h.DispatchCall(ctx, dispatcher.Call{Name: Exec, Args: json.RawMessage(`{"argv":["sh","-c","echo bad"]}`)})
+	out, _ := h.DispatchCall(context.Background(), dispatcher.Call{Name: Exec, Args: json.RawMessage(`{"argv":["sh","-c","echo bad"]}`)}, dispatcher.Authorization{Decision: dispatcher.Approved})
 	if out.Kind() != dispatcher.OutcomeFailed {
 		t.Fatalf("expected failure, got %v", out.Kind())
 	}
@@ -68,7 +65,7 @@ func TestEnvironmentIsExplicit(t *testing.T) {
 	h := handler(t, `"require_approval":false,"profiles":[{"name":"test","rules":[{"executable":"printenv"}]}],"env_allow":["SAFE"],"forward_host_env":[]`)
 	out, _ := h.DispatchCall(context.Background(), dispatcher.Call{
 		Name: Exec, Args: json.RawMessage(`{"argv":["printenv","SAFE"],"env":{"SAFE":"yes"}}`),
-	})
+	}, dispatcher.Authorization{})
 	if out.Kind() != dispatcher.OutcomeResult {
 		t.Fatalf("outcome=%v: %s", out.Kind(), out.Message())
 	}

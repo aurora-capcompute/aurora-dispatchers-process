@@ -3,7 +3,6 @@ package process
 import (
 	"github.com/aurora-capcompute/aurora-dispatchers/builtin"
 	"github.com/aurora-capcompute/aurora-dispatchers/registry"
-	"github.com/aurora-capcompute/aurora-dispatchers/resolution"
 	"bytes"
 	"github.com/aurora-capcompute/capcompute/dispatcher"
 	"context"
@@ -207,18 +206,18 @@ type Handler struct {
 
 func (*Handler) Handles(name string) bool { return name == Exec }
 
-func (h *Handler) DispatchCall(ctx context.Context, call dispatcher.Call) (dispatcher.Outcome, error) {
+func (h *Handler) DispatchCall(ctx context.Context, call dispatcher.Call, auth dispatcher.Authorization) (dispatcher.Outcome, error) {
 	var req Request
 	if err := decodeStrict(call.Args, &req); err != nil {
-		return dispatcher.Failed("decode process.exec request: " + err.Error()), nil
+		return dispatcher.Fail("decode process.exec request: " + err.Error()), nil
 	}
 	decision, err := h.classify(req)
 	if err != nil {
-		return dispatcher.Failed(err.Error()), nil
+		return dispatcher.Fail(err.Error()), nil
 	}
 	approved := false
 	if boolVal(h.settings.RequireApproval) || decision == commandApproval {
-		if resolved, ok := resolution.FromContext(ctx); !ok || resolved.Decision != resolution.Approved {
+		if auth.Decision != dispatcher.Approved {
 			return dispatcher.Yield("Approve local command: " + quoteArgv(req.Argv)), nil
 		}
 		approved = true
@@ -228,7 +227,7 @@ func (h *Handler) DispatchCall(ctx context.Context, call dispatcher.Call) (dispa
 		if ctx.Err() != nil {
 			return dispatcher.Outcome{}, ctx.Err()
 		}
-		return dispatcher.Failed(err.Error()), nil
+		return dispatcher.Fail(err.Error()), nil
 	}
 	response.Approved = approved
 	raw, err := json.Marshal(response)
