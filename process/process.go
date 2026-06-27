@@ -1,11 +1,11 @@
 package process
 
 import (
-	"aurora-dispatchers/builtin"
-	"aurora-dispatchers/registry"
-	"aurora-dispatchers/resolution"
+	"github.com/aurora-capcompute/aurora-dispatchers/builtin"
+	"github.com/aurora-capcompute/aurora-dispatchers/registry"
+	"github.com/aurora-capcompute/aurora-dispatchers/resolution"
 	"bytes"
-	"capcompute/dispatcher"
+	"github.com/aurora-capcompute/capcompute/dispatcher"
 	"context"
 	"encoding/json"
 	"errors"

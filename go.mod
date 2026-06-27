@@ -1,16 +1,12 @@
-module aurora-dispatchers-process
+module github.com/aurora-capcompute/aurora-dispatchers-process
 
 go 1.26
 
 require (
-	aurora-dispatchers v0.0.0
-	capcompute v0.0.0
+	github.com/aurora-capcompute/aurora-dispatchers v0.0.0-00010101000000-000000000000
+	github.com/aurora-capcompute/capcompute v0.0.0-00010101000000-000000000000
 )
 
-replace aurora-dispatchers => ../aurora-dispatchers
 
-replace aurora-capcompute => ../aurora-capcompute
 
-replace aurora-stores => ../aurora-stores
 
-replace capcompute => ../capcompute
