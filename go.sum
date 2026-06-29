@@ -2,3 +2,5 @@ github.com/aurora-capcompute/aurora-dispatchers v0.0.0-20260629161346-52a96ac6ce
 github.com/aurora-capcompute/aurora-dispatchers v0.0.0-20260629161346-52a96ac6ce45/go.mod h1:KWmwX3cgtkGXreqN/HU9d+ML6eyDFfwIrU8528XKWEk=
 github.com/aurora-capcompute/capcompute v0.0.0-20260627172717-954ff0270676 h1:KNTXKfuUJgT6xnRSnTL4IYe2E87bXrr01ay7rJwmylo=
 github.com/aurora-capcompute/capcompute v0.0.0-20260627172717-954ff0270676/go.mod h1:mj6yFasv226xeH9QkiUm72zWDEhTlWAFks4IfWj/C0Y=
+github.com/aurora-capcompute/capcompute v0.0.0-20260628011649-3614a522a3b9 h1:cyk4X3EB9dIJ7eQDtwC3IgwHn5QQtqWfvkQgT3T/mW0=
+github.com/aurora-capcompute/capcompute v0.0.0-20260628011649-3614a522a3b9/go.mod h1:mj6yFasv226xeH9QkiUm72zWDEhTlWAFks4IfWj/C0Y=
